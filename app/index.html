@@ -229,10 +229,19 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
 .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--panel);
   border:1px solid var(--line);border-bottom:0;border-radius:var(--r) var(--r) 0 0;
   box-shadow:0 -8px 30px rgba(9,11,14,.16);
-  padding:6px 20px calc(18px + env(safe-area-inset-bottom));transform:translateY(102%);
+  /* Parked with a viewport length, not a percentage. translateY(102%) resolves against the
+     sheet's OWN height, and Chromium was not recomputing it when that height changed: the
+     parked sheet quietly slid 300px up into the phone the moment the input was typed into, so
+     every recording showed a blank "Confirm transfer" panel before anything had been asked.
+     The sheet can never be taller than 88% of the phone and the phone never exceeds the
+     viewport, so 90dvh always parks it clear of the bottom edge. */
+  padding:6px 20px calc(18px + env(safe-area-inset-bottom));transform:translateY(90dvh);
   transition:transform .34s cubic-bezier(.32,.72,0,1);z-index:6;
   min-height:52%;max-height:88%;overflow-y:auto;display:flex;flex-direction:column}
 .sheet.up{transform:translateY(0)}
+/* An author rule setting display beats the browser's own [hidden]{display:none}, so .sheet
+   being display:flex meant the hidden attribute was set and then quietly ignored. */
+.sheet[hidden]{display:none}
 /* The sheet covers the ask bar, so the only way out used to be Cancel, which also threw away the
    pending call. The handle now collapses the sheet and KEEPS the call, which is what "close this
    and say what to change" actually asks of it. */
@@ -361,19 +370,25 @@ pre{font:11.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line
 .status.live{color:var(--ok);border-color:var(--ok)}
 .status.down{color:var(--accent);border-color:var(--accent)}
 .status.load{color:var(--mute);border-color:var(--line)}
-.loader{padding:12px 20px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+/* z-index above the tour (100) and the nav (30): this is the only thing that can be on top,
+   because until it finishes there is nothing behind it worth touching. */
+.loader{position:fixed;inset:0;z-index:300;display:grid;place-items:center;
+  padding:24px;background:var(--bg)}
 .loader[hidden]{display:none}
+.lcard{width:100%;max-width:420px;text-align:left}
+.lbrand{font:800 20px var(--display);letter-spacing:-.02em;margin-bottom:26px}
+.lbrand i{font-style:normal;color:var(--brand)}
 .ltop{display:flex;justify-content:space-between;align-items:baseline;
-  font:600 12.5px var(--sans);color:var(--ink)}
-.ltop #lpc{font-family:var(--mono);font-size:11.5px;color:var(--mute)}
-.ltrack{height:4px;border-radius:999px;background:var(--line);overflow:hidden;margin:8px 0 7px}
+  font:600 14px var(--sans);color:var(--ink)}
+.ltop #lpc{font-family:var(--mono);font-size:12px;color:var(--mute)}
+.ltrack{height:6px;border-radius:999px;background:var(--line);overflow:hidden;margin:12px 0 14px}
 .ltrack i{display:block;height:100%;width:0;border-radius:999px;background:var(--brand);
   transition:width .25s linear}
 /* Before the first byte arrives there is no percentage to show, so the bar sweeps instead of
    sitting at zero looking stuck. */
 .ltrack.idle i{width:38%;animation:sweep 1.25s ease-in-out infinite}
 @keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(264%)}}
-.lsub{display:block;font-size:11.5px;color:var(--mute);line-height:1.45}
+.lsub{margin:0;font-size:13.5px;color:var(--mute);line-height:1.6}
 .frow.short .k,.frow.short .v{color:var(--warn)}
 .frow.short .v{font-weight:700}
 .btn.pri.warn{background:var(--warn)}
@@ -430,12 +445,6 @@ pre{font:11.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line
 
     <!-- The model has to come down before anything works. That is a loading state, not something
          the assistant said, so it lives here and not in the conversation. -->
-    <div class="loader" id="loader" hidden>
-      <div class="ltop"><span id="ltext">Getting the model</span><span id="lpc"></span></div>
-      <div class="ltrack"><i id="lfill"></i></div>
-      <span class="lsub">Once only. After this it stays in your browser and runs here.</span>
-    </div>
-
     <div class="scroll" id="scroll">
       <div class="balcard">
         <div class="bctop">
@@ -505,7 +514,7 @@ pre{font:11.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line
 
     <div class="scrim" id="scrim"></div>
 
-    <div class="sheet" id="sheet">
+    <div class="sheet" id="sheet" hidden>
       <button class="grabzone" id="grab" aria-label="Collapse, keeping the call"><span class="grab"></span></button>
       <h3 id="sheetTitle">Confirm transfer</h3>
       <div class="who" id="sheetSub">MORENA read your request and filled this in</div>
@@ -730,7 +739,12 @@ async function health(){
     return {n, url: p.gguf_url || "/model.gguf"};
   }).catch(() => ({n:"", url:"/model.gguf"}));
 
-  await loadOnDevice(EDGE + "/" + (await named).n + ".gguf", named);
+  // ?fresh=1 appends a cache buster to the weights URL, so a run can be checked the way a
+  // first-time visitor sees it. The browser's HTTP cache holds the file under its exact URL and
+  // clearing site storage does not touch it, so without this a "cold" test is not cold.
+  let url = EDGE + "/" + (await named).n + ".gguf";
+  if(new URLSearchParams(location.search).get("fresh") === "1") url += "?cb=" + Date.now();
+  await loadOnDevice(url, named);
 }
 
 async function loadOnDevice(url, named){
@@ -791,6 +805,7 @@ async function loadOnDevice(url, named){
     try{ await named; }catch(_){}
     el.textContent = "on this device";
     el.className = "status live";
+    startTour();
     lede("on this device, in this browser tab" + (w.useMultiThread ? " on " + w.nbThreads + " threads" : ""));
     note.hidden = true;
   }catch(e){
@@ -800,6 +815,7 @@ async function loadOnDevice(url, named){
     try{ n = (await named).n; }catch(_){}
     el.textContent = n || "server"; el.className = "status live";
     lede("on a server, because this browser could not run it here");
+    startTour();
   }
 }
 
@@ -1101,6 +1117,17 @@ function renderSheet(changed, removed){
   $("#confirm").textContent = short ? "Confirm anyway" : "Confirm";
   $("#confirm").classList.toggle("warn", short);
 }
+/* The confirmation sheet is not in the page until there is something to confirm.
+
+   It used to sit there permanently, parked below the bottom edge by a transform and relying on
+   the phone clipping its overflow. That is one CSS mistake away from a blank "Confirm transfer"
+   panel appearing before anyone has asked for anything, and it happened three times, from three
+   different causes: the phone being measured taller than the window, a percentage transform the
+   browser did not recompute, and the sheet peeking through a gap in a recording. An element that
+   is not rendered cannot do any of that. It is added when a call needs confirming and taken back
+   out once it has slid away. */
+let sheetTimer = null;
+
 function openSheet(changed, removed){
   // Drop focus before the sheet animates in. On a phone the ask bar still holds focus from the
   // message that triggered this, so the on-screen keyboard is up, and it shoves the confirm sheet
@@ -1108,8 +1135,21 @@ function openSheet(changed, removed){
   // there at all.
   if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
   renderSheet(changed, removed);
-  $("#sheet").classList.add("up"); $("#scrim").classList.add("up"); setPendBar(); }
-function closeSheet(){ $("#sheet").classList.remove("up"); $("#scrim").classList.remove("up");
+  const sheet = $("#sheet");
+  clearTimeout(sheetTimer);
+  sheet.hidden = false;
+  // Read a layout property so the browser has the sheet in its parked position before the class
+  // that moves it lands. Without this the two happen in one frame and there is no slide, the
+  // sheet just appears.
+  void sheet.offsetHeight;
+  sheet.classList.add("up"); $("#scrim").classList.add("up"); setPendBar(); }
+
+function closeSheet(){
+  const sheet = $("#sheet");
+  sheet.classList.remove("up"); $("#scrim").classList.remove("up");
+  clearTimeout(sheetTimer);
+  // Out of the page once the slide has finished, not before, or it vanishes mid-animation.
+  sheetTimer = setTimeout(() => { if(!sheet.classList.contains("up")) sheet.hidden = true; }, 380);
   setPendBar(); }
 function setPendBar(){
   const open = $("#sheet").classList.contains("up");
@@ -1368,7 +1408,22 @@ try{ seen = localStorage.getItem("morena-pay-tour"); }catch(_){}
 const tourFlag = new URLSearchParams(location.search).get("tour");
 if(tourFlag === "0") seen = "skipped";
 if(tourFlag === "1") seen = null;
-if(!seen) setTimeout(coachShow, 450);
+// The tour waits for the model. Opening it at 450ms put it behind the loading screen, so it
+// was already on step one by the time anyone could see it.
+function startTour(){ if(!seen) setTimeout(coachShow, 450); }
 </script>
+
+<!-- Nothing on this page works until the model is here, so nothing on this page is shown until
+     the model is here. Over the whole window, the nav and the explanation included. -->
+<div class="loader" id="loader">
+  <div class="lcard">
+    <div class="lbrand">MORENA <i>Pay</i></div>
+    <div class="ltop"><span id="ltext">Getting the model</span><span id="lpc"></span></div>
+    <div class="ltrack"><i id="lfill"></i></div>
+    <p class="lsub">The model is downloading to this device. It happens once, then it stays in
+      your browser and every answer is worked out here, on your machine, with nothing sent to a
+      server.</p>
+  </div>
+</div>
 </body>
 </html>
