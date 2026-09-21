@@ -696,7 +696,11 @@ const WLLAMA_VER = "3.6.1";
 // Runtime and weights both come from Cloudflare rather than from the app server or a public CDN.
 // Measured from Lagos: Modal 110 KB/s, jsDelivr ~100-300 KB/s, this 3.2 MB/s. The nano file is
 // 142 MB, so that is the difference between a 22 minute wait and a 45 second one.
-const EDGE = "https://morena-edge.ishe.workers.dev";
+// Served from a machine you are sitting at (a dev server, or a recording harness), the weights
+// come from that same origin instead, so a local run does not pull 142 MB over the internet. Only
+// localhost, so a hosted page can never be pointed at someone else's model file.
+const LOCAL = /^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname);
+const EDGE = LOCAL ? location.origin : "https://morena-edge.ishe.workers.dev";
 const WASM_URL = EDGE + "/wllama-" + WLLAMA_VER + ".wasm";
 const ESM_URL  = EDGE + "/wllama-" + WLLAMA_VER + ".js";
 let wllama = null;       // the loaded on-device model, or null
@@ -737,6 +741,13 @@ async function loadOnDevice(url, named){
     const w = new Wllama({ default: WASM_URL });
     await w.loadModelFromUrl(url, {
       n_ctx: 4096,
+      // Almost all of the time in a turn is spent reading the ten-tool menu back in, not writing
+      // the answer. A wider batch is the single biggest lever on that in wasm: the default
+      // chews the prompt in small bites and prompt handling is what you are waiting for.
+      n_batch: 512,
+      n_ubatch: 512,
+      flash_attn: true,
+      n_threads: Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 4) - 1)),
       progressCallback: ({loaded, total}) => {
         if(total){
           const pc = Math.round(loaded / total * 100);
@@ -758,6 +769,16 @@ async function loadOnDevice(url, named){
     $("#lpc").textContent = "";
     wllama = w;
     onDevice = true;
+
+    // Every request starts with the same block: the tool menu, unchanged, about six hundred
+    // tokens of it. Reading that block is most of the wait. Run it once here, while the loader
+    // is already up and nobody is waiting on an answer, and llama.cpp keeps it in the KV cache,
+    // so the first real question only has to read the question.
+    try{
+      $("#ltext").textContent = "Reading the tool menu";
+      await w.createCompletion({prompt: U + "\n" + T + MJ + "\n", n_predict: 1,
+                                temperature: 0, top_p: 1});
+    }catch(e){ console.error("[morena] warm-up failed, first answer will be slower:", e); }
     // The parameter count has to match the model that actually ran, so it is read from the file
     // the browser loaded rather than assumed.
     try{ await named; }catch(_){}
