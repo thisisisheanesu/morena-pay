@@ -4,18 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MORENA Pay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap">
 <style>
+/* Vambo's own design tokens, read from the live stylesheet at vambo.ai rather than eyeballed:
+   #f5f5f0 page, #1a1a1a ink, #e5e5e0 borders, #c62828 red, --radius .625rem, League Spartan for
+   display. Pay and Studio should look like Vambo products, not like two unrelated demos. */
 :root{
   --navh:56px;
-  --ink:#0d1117; --mute:#5b6472; --line:#e4e7ec; --panel:#fff; --bg:#eef0f4;
-  --brand:#0f7b6c; --brand2:#12a594; --accent:#e8590c; --accent-soft:#fff2e8;
-  --ok:#15803d; --ok-soft:#eefaf1; --warn:#a16207; --warn-soft:#fef6dd;
-  --card1:#0f7b6c; --card2:#0b4f46;
-  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  --sans:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --ink:#1a1a1a; --mute:#6f6f68; --faint:#9a9a92; --line:#e5e5e0; --panel:#fff; --bg:#f5f5f0;
+  --brand:#c62828; --brand2:#ef5350; --brand-dark:#b71c1c;
+  --accent:#c62828; --accent-soft:#fbeaea;
+  --ok:#2e7d32; --ok-soft:#eaf3ea; --warn:#ef6c00; --warn-soft:#fdf0e3;
+  --card1:#1a1a1a; --card2:#0a0a0a;
+  --r:.625rem; --r-xs:.125rem;
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:"League Spartan",ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --display:"League Spartan",ui-sans-serif,system-ui,sans-serif;
 }
-/* Light only, on purpose. A demo that flips palette with the viewer's OS setting is a
-   demo whose screenshots and recordings do not match each other. */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
   font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
@@ -27,7 +34,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
    sheet with it, which is why nothing worked on mobile. 100dvh, not 100vh, because the browser
    chrome on iOS makes vh taller than the visible area. */
 .tabs{display:flex;max-width:390px;width:100%;margin:0 auto 12px;background:var(--panel);
-  border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .tabs button{flex:1;position:relative;border:0;background:none;cursor:pointer;
   padding:9px 6px 8px;font:600 11px var(--sans);color:var(--mute);
   display:flex;flex-direction:column;align-items:center;gap:4px}
@@ -87,7 +94,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
 /* Height is capped to the window, not fixed at 788px. At 788 the ask bar sat below the fold on a
    laptop, so the first thing anyone saw was a bank app with no way to talk to it. */
 .phone{width:390px;max-width:100%;flex:0 0 auto;background:var(--panel);
-  border-radius:34px;border:1px solid var(--line);overflow:hidden;
+  border-radius:var(--r);border:1px solid var(--line);overflow:hidden;
   box-shadow:0 22px 60px rgba(0,0,0,.16),0 2px 6px rgba(0,0,0,.06);
   display:flex;flex-direction:column;position:relative;
   height:min(788px, calc(100dvh - 52px)); min-height:560px}
@@ -99,20 +106,20 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
 .hi b{display:block;font-size:15px;letter-spacing:-.01em}
 .hi span{font-size:12px;color:var(--mute)}
 .badge{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-  padding:4px 8px;border-radius:5px;background:var(--accent-soft);color:var(--accent)}
+  padding:4px 8px;border-radius:var(--r-xs);background:var(--accent-soft);color:var(--accent)}
 .scroll{flex:1;overflow-y:auto;padding:0 20px 14px;scrollbar-width:thin}
 
-.balcard{border-radius:20px;padding:19px;color:#fff;position:relative;overflow:hidden;
+.balcard{border-radius:var(--r);padding:19px;color:#fff;position:relative;overflow:hidden;
   background:linear-gradient(135deg,var(--card1),var(--card2))}
 .balcard:after{content:"";position:absolute;right:-46px;top:-46px;width:150px;height:150px;
-  border-radius:50%;background:rgba(255,255,255,.07)}
+  border-radius:50%;background:rgba(198,40,40,.34)}
 .balcard .lab{font-size:11.5px;opacity:.82;letter-spacing:.07em;text-transform:uppercase}
-.balcard .amt{font-size:33px;font-weight:700;letter-spacing:-.025em;margin:5px 0 14px;
+.balcard .amt{font-family:var(--display);font-size:34px;font-weight:700;letter-spacing:-.02em;margin:5px 0 14px;
   font-variant-numeric:tabular-nums}
 .balcard .foot{display:flex;justify-content:space-between;font-size:12px;opacity:.85;
   font-family:var(--mono)}
 .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:15px 0 6px}
-.qa{background:transparent;border:1px solid var(--line);border-radius:13px;padding:11px 4px;
+.qa{background:transparent;border:1px solid var(--line);border-radius:var(--r);padding:11px 4px;
   display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;
   font:600 11px var(--sans);color:var(--mute)}
 .qa:hover{border-color:var(--brand);color:var(--brand)}
@@ -122,7 +129,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
   color:var(--mute);margin:19px 0 8px}
 .tx{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
 .tx:last-child{border-bottom:0}
-.txi{width:37px;height:37px;border-radius:11px;flex:0 0 auto;display:grid;place-items:center;
+.txi{width:37px;height:37px;border-radius:var(--r);flex:0 0 auto;display:grid;place-items:center;
   font-weight:700;font-size:13px;background:var(--bg);color:var(--mute)}
 .tx.out .txi{background:var(--accent-soft);color:var(--accent)}
 .tx.in .txi{background:var(--ok-soft);color:var(--ok)}
@@ -136,7 +143,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
 
 /* chat */
 .msgs{display:flex;flex-direction:column;gap:9px;margin-top:6px}
-.msg{max-width:84%;padding:9px 13px;border-radius:15px;font-size:14px;line-height:1.45}
+.msg{max-width:84%;padding:9px 13px;border-radius:var(--r);font-size:14px;line-height:1.45}
 .msg.me{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:5px}
 .msg.bot{align-self:flex-start;background:var(--bg);border:1px solid var(--line);
   border-bottom-left-radius:5px}
@@ -152,7 +159,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
 /* A receipt in the thread. The sheet disappears on confirm, and without this the only trace of
    what just happened was a sentence and a row in the list further down. The card is the thing a
    person screenshots and sends to whoever they just paid. */
-.receipt{align-self:stretch;max-width:100%;border:1px solid var(--line);border-radius:14px;
+.receipt{align-self:stretch;max-width:100%;border:1px solid var(--line);border-radius:var(--r);
   background:var(--panel);overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.05)}
 .receipt .rtop{display:flex;align-items:center;gap:10px;padding:12px 14px;
   background:linear-gradient(135deg,var(--card1),var(--card2));color:#fff}
@@ -205,7 +212,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
   transition:opacity .28s ease}
 .scrim.up{opacity:1;pointer-events:auto}
 .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--panel);
-  border:1px solid var(--line);border-bottom:0;border-radius:16px 16px 0 0;
+  border:1px solid var(--line);border-bottom:0;border-radius:var(--r) var(--r) 0 0;
   box-shadow:0 -8px 30px rgba(9,11,14,.16);
   padding:6px 20px calc(18px + env(safe-area-inset-bottom));transform:translateY(102%);
   transition:transform .34s cubic-bezier(.32,.72,0,1);z-index:6;
@@ -215,10 +222,10 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
    pending call. The handle now collapses the sheet and KEEPS the call, which is what "close this
    and say what to change" actually asks of it. */
 .grabzone{padding:6px 0 9px;cursor:pointer;display:block;width:100%;border:0;background:none}
-.grab{width:38px;height:4px;border-radius:3px;background:var(--line);margin:0 auto;
+.grab{width:38px;height:4px;border-radius:var(--r-xs);background:var(--line);margin:0 auto;
   transition:background .15s}
 .grabzone:hover .grab{background:var(--mute)}
-.pendbar{display:none;align-items:center;gap:9px;margin:0 0 9px;padding:9px 12px;border-radius:11px;
+.pendbar{display:none;align-items:center;gap:9px;margin:0 0 9px;padding:9px 12px;border-radius:var(--r);
   background:var(--accent-soft);border:1px solid var(--accent);cursor:pointer;width:100%;
   font:600 12.5px var(--sans);color:var(--accent);text-align:left}
 .pendbar.on{display:flex}
@@ -226,11 +233,11 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
   animation:p 1.6s ease-in-out infinite}
 @keyframes p{50%{opacity:.3}}
 .pendbar .go{margin-left:auto;font-weight:500;opacity:.8}
-.sheet h3{margin:0 0 4px;font-size:17px;font-weight:650;letter-spacing:-.015em}
+.sheet h3{margin:0 0 4px;font-family:var(--display);font-size:18px;font-weight:700;letter-spacing:-.015em}
 .sheet .who{font-size:13px;color:var(--mute);margin-bottom:14px;line-height:1.45}
 #fields{flex:1}
 .frow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 11px;
-  border-radius:10px;margin-bottom:2px;border:1px solid transparent;transition:background .2s}
+  border-radius:var(--r);margin-bottom:2px;border:1px solid transparent;transition:background .2s}
 .frow:nth-child(odd){background:var(--bg)}
 .frow.changed:nth-child(odd),.frow.removed:nth-child(odd){background:var(--accent-soft)}
 .frow .k{font-size:13px;color:var(--mute)}
@@ -241,11 +248,11 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
 .frow.removed{background:var(--warn-soft);border-color:var(--warn);opacity:.7}
 .frow.removed .v{text-decoration:line-through}
 .pill{display:inline-block;font:600 9.5px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;
-  padding:3px 6px;border-radius:4px;margin-left:7px;vertical-align:1px}
+  padding:3px 6px;border-radius:var(--r-xs);margin-left:7px;vertical-align:1px}
 .pill.changed{background:var(--accent);color:#fff}
 .pill.removed{background:var(--warn);color:#fff}
 .sheetbtns{display:flex;gap:8px;margin-top:16px;padding-top:15px;border-top:1px solid var(--line)}
-.btn{flex:1;padding:11px 16px;border-radius:9px;cursor:pointer;font:600 14px var(--sans);
+.btn{flex:1;padding:11px 16px;border-radius:var(--r);cursor:pointer;font:600 14px var(--sans);
   border:1px solid transparent;transition:opacity .15s,background .15s}
 .btn.pri{background:var(--ink);color:var(--panel)}
 .btn.pri:hover{opacity:.9}
@@ -264,7 +271,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
    grey wash: dim, but never actually out of focus. This builds the backdrop from four panels
    around the spotlight instead. Each one carries its own blur, so everything except the
    highlighted control is genuinely defocused, and the hole is a real hole. */
-.coach{position:absolute;inset:0;z-index:20;display:none;border-radius:34px;overflow:hidden}
+.coach{position:absolute;inset:0;z-index:20;display:none;border-radius:var(--r);overflow:hidden}
 .coach.on{display:block}
 .shade{position:absolute;background:rgba(6,9,12,.66);backdrop-filter:blur(5px);
   -webkit-backdrop-filter:blur(5px);transition:all .28s cubic-bezier(.32,.72,0,1)}
@@ -275,22 +282,22 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
 .coachcard.top{top:80px;bottom:auto}
 .coachcard h3{margin:0 0 7px;font-size:17.5px;letter-spacing:-.01em}
 .coachcard p{margin:0;font-size:14px;color:var(--mute);line-height:1.55}
-.coachcard .eg{display:block;margin-top:10px;padding:9px 12px;border-radius:9px;
+.coachcard .eg{display:block;margin-top:10px;padding:9px 12px;border-radius:var(--r);
   background:var(--bg);border:1px dashed var(--line);font-size:13.5px;color:var(--ink)}
 .coachnav{display:flex;align-items:center;gap:10px;margin-top:15px}
 .dots2{display:flex;gap:5px}
 .dots2 i{width:6px;height:6px;border-radius:50%;background:var(--line)}
-.dots2 i.on{background:var(--brand);width:16px;border-radius:3px}
+.dots2 i.on{background:var(--brand);width:16px;border-radius:var(--r-xs)}
 .coachnav .skip{margin-left:auto;background:none;border:0;color:var(--mute);cursor:pointer;
   font:500 13px var(--sans);padding:8px 4px}
-.coachnav .next{background:var(--brand);color:#fff;border:0;border-radius:10px;cursor:pointer;
+.coachnav .next{background:var(--brand);color:#fff;border:0;border-radius:var(--r);cursor:pointer;
   font:700 13.5px var(--sans);padding:10px 20px}
-.spot{position:absolute;border-radius:14px;border:2px solid var(--brand);
+.spot{position:absolute;border-radius:var(--r);border:2px solid var(--brand);
   box-shadow:0 0 0 4px rgba(45,212,191,.25);pointer-events:none;
   transition:all .28s cubic-bezier(.32,.72,0,1)}
 
 /* ---------- plain english panel ---------- */
-.plain{display:flex;gap:11px;align-items:flex-start;padding:12px 13px;border-radius:12px;
+.plain{display:flex;gap:11px;align-items:flex-start;padding:12px 13px;border-radius:var(--r);
   border:1px solid var(--line);background:var(--panel);margin-bottom:9px}
 .plain .ic{width:26px;height:26px;border-radius:8px;flex:0 0 auto;display:grid;place-items:center;
   font-size:14px;background:var(--bg)}
@@ -304,7 +311,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
   background:transparent;border-radius:999px;padding:6px 12px;font:600 11.5px var(--sans);
   color:var(--mute)}
 .toggle:hover{border-color:var(--brand);color:var(--brand)}
-.toggle .sw{width:26px;height:15px;border-radius:9px;background:var(--line);position:relative;
+.toggle .sw{width:26px;height:15px;border-radius:var(--r);background:var(--line);position:relative;
   transition:background .2s}
 .toggle .sw:after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;
   border-radius:50%;background:var(--panel);transition:transform .2s}
@@ -314,20 +321,20 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
 /* ---------- inspector ---------- */
 .side{flex:1;min-width:0;max-width:430px;display:flex;flex-direction:column;gap:14px}
 .brandline{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
-.brandline h1{margin:0;font-size:21px;letter-spacing:-.02em}
+.brandline h1{margin:0;font-family:var(--display);font-size:22px;font-weight:800;letter-spacing:-.02em}
 .brandline h1 em{font-style:normal;color:var(--brand)}
 .brandline .v{font:11px var(--mono);color:var(--mute)}
 .lede{color:var(--mute);font-size:13.5px;margin:7px 0 0}
-.box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:15px}
 .box h2{margin:0 0 11px;font-size:11px;font-weight:700;letter-spacing:.09em;
   text-transform:uppercase;color:var(--mute)}
-.verd{padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;
+.verd{padding:9px 12px;border-radius:var(--r);font-size:13px;font-weight:600;
   border:1px solid;margin-bottom:8px;display:flex;gap:8px;align-items:flex-start}
 .verd.good{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
 .verd.bad{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .verd.idle{background:transparent;border-color:var(--line);color:var(--mute);font-weight:500}
 pre{font:11.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line);
-  border-radius:9px;padding:11px;overflow-x:auto;margin:8px 0 0;white-space:pre-wrap;
+  border-radius:var(--r);padding:11px;overflow-x:auto;margin:8px 0 0;white-space:pre-wrap;
   word-break:break-word;color:var(--ink)}
 .kv{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;
   border-bottom:1px dotted var(--line)}
@@ -350,7 +357,7 @@ pre{font:11.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line
 .chip{font:500 11.5px var(--sans);padding:6px 10px;border-radius:999px;cursor:pointer;
   border:1px solid var(--line);background:transparent;color:var(--mute)}
 .chip:hover{border-color:var(--brand);color:var(--brand)}
-.ghostbtn{font:600 11.5px var(--sans);padding:6px 11px;border-radius:7px;cursor:pointer;
+.ghostbtn{font:600 11.5px var(--sans);padding:6px 11px;border-radius:var(--r-xs);cursor:pointer;
   border:1px solid var(--line);background:transparent;color:var(--mute)}
 
 /* On a phone the FRAME is square and the contents are not. The screen has no rounded corners, so
@@ -361,7 +368,7 @@ pre{font:11.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line
    the sheet silently loses. */
 @media(max-width:940px){
   .phone,.coach,.scrim{border-radius:0}
-  .sheet{border-radius:18px 18px 0 0}
+  .sheet{border-radius:var(--r) var(--r) 0 0}
 }
 </style>
 </head>
