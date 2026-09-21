@@ -271,15 +271,14 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
    grey wash: dim, but never actually out of focus. This builds the backdrop from four panels
    around the spotlight instead. Each one carries its own blur, so everything except the
    highlighted control is genuinely defocused, and the hole is a real hole. */
-.coach{position:absolute;inset:0;z-index:20;display:none;border-radius:var(--r);overflow:hidden}
+.coach{position:fixed;inset:0;z-index:100;display:none;overflow:hidden}
 .coach.on{display:block}
-.shade{position:absolute;background:rgba(6,9,12,.66);backdrop-filter:blur(5px);
-  -webkit-backdrop-filter:blur(5px);transition:all .28s cubic-bezier(.32,.72,0,1)}
-.coach.full .shade#sh-t{inset:0}
-.coach.full .shade#sh-b,.coach.full .shade#sh-l,.coach.full .shade#sh-r{display:none}
-.coachcard{position:absolute;left:14px;right:14px;bottom:16px;background:var(--panel);
+.shade{position:fixed;inset:0;z-index:1;background:rgba(6,9,12,.78);backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px)}
+.shade#sh-b,.shade#sh-l,.shade#sh-r{display:none}
+.coachcard{position:fixed;z-index:3;left:50%;transform:translateX(-50%);width:min(362px,calc(100vw - 28px));bottom:22px;background:var(--panel);
   border-radius:18px;padding:19px 18px 16px;box-shadow:0 14px 44px rgba(0,0,0,.3)}
-.coachcard.top{top:80px;bottom:auto}
+.coachcard.top{top:78px;bottom:auto}
 .coachcard h3{margin:0 0 7px;font-size:17.5px;letter-spacing:-.01em}
 .coachcard p{margin:0;font-size:14px;color:var(--mute);line-height:1.55}
 .coachcard .eg{display:block;margin-top:10px;padding:9px 12px;border-radius:var(--r);
@@ -292,7 +291,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
   font:500 13px var(--sans);padding:8px 4px}
 .coachnav .next{background:var(--brand);color:#fff;border:0;border-radius:var(--r);cursor:pointer;
   font:700 13.5px var(--sans);padding:10px 20px}
-.spot{position:absolute;border-radius:var(--r);border:2px solid var(--brand);
+.spot{position:fixed;z-index:2;border-radius:var(--r);border:2px solid var(--brand);
   box-shadow:0 0 0 4px rgba(45,212,191,.25);pointer-events:none;
   transition:all .28s cubic-bezier(.32,.72,0,1)}
 
@@ -593,27 +592,21 @@ function coachShow(){
   $("#coachcard").classList.toggle("top", !!c.top);
   const spot = $("#spot"), coach = $("#coach");
   const el = c.sel ? document.querySelector(c.sel) : null;
+  // The tour blacks out the whole page, top nav included: one full-screen panel, no cutouts.
+  // The control being talked about gets a ring drawn over the top of the blackout so you can
+  // still see where to look once the tour ends.
   if(el){
-    const p = $(".phone").getBoundingClientRect(), r = el.getBoundingClientRect();
-    const x = r.left - p.left - 5, y = r.top - p.top - 5, w = r.width + 10, h = r.height + 10;
+    const r = el.getBoundingClientRect();
     spot.style.display = "";
-    Object.assign(spot.style, {left:x+"px", top:y+"px", width:w+"px", height:h+"px"});
-    // Four panels boxing in the hole: above it, below it, and the two strips beside it.
-    Object.assign($("#sh-t").style, {left:0, top:0, width:"100%", height:Math.max(0,y)+"px"});
-    Object.assign($("#sh-b").style, {left:0, top:(y+h)+"px", width:"100%",
-                                     height:Math.max(0, p.height-(y+h))+"px"});
-    Object.assign($("#sh-l").style, {left:0, top:y+"px", width:Math.max(0,x)+"px", height:h+"px"});
-    Object.assign($("#sh-r").style, {left:(x+w)+"px", top:y+"px",
-                                     width:Math.max(0, p.width-(x+w))+"px", height:h+"px"});
-    coach.classList.remove("full");
+    Object.assign(spot.style, {left:(r.left-5)+"px", top:(r.top-5)+"px",
+                              width:(r.width+10)+"px", height:(r.height+10)+"px"});
   } else {
     spot.style.display = "none";
-    coach.classList.add("full");
   }
   coach.classList.add("on");
 }
 function coachEnd(run){
-  $("#coach").classList.remove("on", "full");
+  $("#coach").classList.remove("on");
   try{ localStorage.setItem("morena-pay-tour", "done"); }catch(_){}
   if(run) fire("Abeg send 5000 naira give Chidi.");
 }
@@ -1088,7 +1081,12 @@ if(window.visualViewport){
     // instead of sitting fully off it.
     const tabs = document.querySelector(".tabs");
     const th = tabs && getComputedStyle(tabs).display !== "none" ? tabs.offsetHeight : 0;
-    document.querySelector(".phone").style.height = Math.round(vv.height - th) + "px";
+    // Clamp to innerHeight. visualViewport.height can REPORT LARGER than the layout viewport,
+    // and when it does the phone ends up taller than the screen, the page starts scrolling, and
+    // anything position:fixed (the tour dimming) only covers the part you can see. The symptom is
+    // a tour that blacks out the middle of the page and leaves the ask bar lit.
+    const h = Math.min(vv.height, window.innerHeight || vv.height);
+    document.querySelector(".phone").style.height = Math.round(h - th) + "px";
   };
   window.visualViewport.addEventListener("resize", fit);
   window.visualViewport.addEventListener("scroll", fit);
