@@ -354,6 +354,19 @@ pre{font:11.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line
 .status.live{color:var(--ok);border-color:var(--ok)}
 .status.down{color:var(--accent);border-color:var(--accent)}
 .status.load{color:var(--mute);border-color:var(--line)}
+.loader{padding:12px 20px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.loader[hidden]{display:none}
+.ltop{display:flex;justify-content:space-between;align-items:baseline;
+  font:600 12.5px var(--sans);color:var(--ink)}
+.ltop #lpc{font-family:var(--mono);font-size:11.5px;color:var(--mute)}
+.ltrack{height:4px;border-radius:999px;background:var(--line);overflow:hidden;margin:8px 0 7px}
+.ltrack i{display:block;height:100%;width:0;border-radius:999px;background:var(--brand);
+  transition:width .25s linear}
+/* Before the first byte arrives there is no percentage to show, so the bar sweeps instead of
+   sitting at zero looking stuck. */
+.ltrack.idle i{width:38%;animation:sweep 1.25s ease-in-out infinite}
+@keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(264%)}}
+.lsub{display:block;font-size:11.5px;color:var(--mute);line-height:1.45}
 .frow.short .k,.frow.short .v{color:var(--warn)}
 .frow.short .v{font-weight:700}
 .btn.pri.warn{background:var(--warn)}
@@ -406,6 +419,14 @@ pre{font:11.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line
       <div class="avatar">AO</div>
       <div class="hi"><b>Adaeze Okafor</b><span>Main account &middot; 0123456789</span></div>
       <span class="badge">demo</span>
+    </div>
+
+    <!-- The model has to come down before anything works. That is a loading state, not something
+         the assistant said, so it lives here and not in the conversation. -->
+    <div class="loader" id="loader" hidden>
+      <div class="ltop"><span id="ltext">Getting the model</span><span id="lpc"></span></div>
+      <div class="ltrack"><i id="lfill"></i></div>
+      <span class="lsub">Once only. After this it stays in your browser and runs here.</span>
     </div>
 
     <div class="scroll" id="scroll">
@@ -707,24 +728,34 @@ async function loadOnDevice(url, named){
   let note = null;
   try{
     setp("loading model");
-    // A 142 MB download deserves more than a word in a pill, and it deserves to say that it is
-    // a one-off, because otherwise the first visit looks like the demo is broken.
     const MB = b => (b / 1048576).toFixed(0) + " MB";
-    note = bubble("bot", "Getting the model so it can run on your device. This happens once, "
-                             + "then it stays in your browser.<br><b id=\"dlpc\">starting</b>");
-    const bar = () => document.getElementById("dlpc");
+    note = $("#loader");
+    note.hidden = false;
+    const track = note.querySelector(".ltrack");
+    track.classList.add("idle");
     const { Wllama } = await import(ESM_URL);
     const w = new Wllama({ default: WASM_URL });
     await w.loadModelFromUrl(url, {
       n_ctx: 4096,
       progressCallback: ({loaded, total}) => {
-        const pc = total ? Math.round(loaded / total * 100) + "%" : MB(loaded);
-        setp(total ? "downloading " + pc : "downloading");
-        const b = bar();
-        if(b) b.textContent = total ? pc + " of " + MB(total) : MB(loaded) + " so far";
+        if(total){
+          const pc = Math.round(loaded / total * 100);
+          track.classList.remove("idle");
+          $("#lfill").style.width = pc + "%";
+          $("#lpc").textContent = pc + "% of " + MB(total);
+          setp("downloading " + pc + "%");
+        }else{
+          $("#lpc").textContent = MB(loaded);
+          setp("downloading");
+        }
       },
     });
-    note.remove();
+    // Download done, model not yet initialised in wasm. Nothing to measure, so the bar sweeps
+    // again; the inline width has to go or it wins over the sweeping rule.
+    $("#ltext").textContent = "Starting it up";
+    $("#lfill").style.width = "";
+    track.classList.add("idle");
+    $("#lpc").textContent = "";
     wllama = w;
     onDevice = true;
     // The parameter count has to match the model that actually ran, so it is read from the file
@@ -733,9 +764,9 @@ async function loadOnDevice(url, named){
     el.textContent = "on this device";
     el.className = "status live";
     lede("on this device, in this browser tab" + (w.useMultiThread ? " on " + w.nbThreads + " threads" : ""));
-    bubble("bot", "Model don load for your device. Everything wey you type from now no dey leave this tab.");
+    note.hidden = true;
   }catch(e){
-    if(note) note.remove();
+    if(note) note.hidden = true;
     console.error("[morena] on-device load failed, falling back to the server:", e);
     let n = "";
     try{ n = (await named).n; }catch(_){}
