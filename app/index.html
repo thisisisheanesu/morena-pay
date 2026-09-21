@@ -353,6 +353,10 @@ pre{font:11.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line
   color:var(--mute);white-space:nowrap}
 .status.live{color:var(--ok);border-color:var(--ok)}
 .status.down{color:var(--accent);border-color:var(--accent)}
+.status.load{color:var(--mute);border-color:var(--line)}
+.frow.short .k,.frow.short .v{color:var(--warn)}
+.frow.short .v{font-weight:700}
+.btn.pri.warn{background:var(--warn)}
 .foot{font-size:11.5px;color:var(--mute);line-height:1.6}
 .foot a{color:var(--brand)}
 .sc{display:grid;grid-template-columns:1fr auto auto;gap:2px 10px;align-items:center;
@@ -493,8 +497,8 @@ pre{font:11.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line
         <h1>MORENA <em>Pay</em></h1>
         <span class="v" id="modelName">checking model</span>
       </div>
-      <p class="lede" id="lede">A small MORENA model, running on this laptop CPU, turning Pidgin,
-        Yoruba, Igbo and Hausa into real API calls. No cloud, no GPU, no network.</p>
+      <p class="lede" id="lede">A small MORENA model turning Pidgin, Yoruba, Igbo and Hausa
+        into real API calls.</p>
     </div>
 
     <div class="box" id="box-explain">
@@ -549,7 +553,7 @@ let balance = 2450000;
 let pending = null;          // {name, arguments}
 let busy = false;
 
-const PARAMS = {"nano-tools":"208M","mini-tools":"503M","nano":"208M","mini":"503M"};
+const PARAMS = {"nano-tools":"209M","mini-tools":"503M","nano":"209M","mini":"503M"};
 const SCORE = [
   ["Picks the right tool",        "9%",  "91%"],
   ["Uses only declared arguments","0%",  "96%"],
@@ -654,31 +658,112 @@ const PRETTY = {
   bank_list:"list the banks", balance_fetch:"check your balance",
 };
 
-/* ---------------- model plumbing ---------------- */
+/* ---------------- model plumbing ----------------
+
+   The model runs HERE, in this tab, not on a server. wllama is llama.cpp built to WebAssembly;
+   it takes the same GGUF the CLI takes and the same raw-prompt completion request, so nothing
+   above this line had to change. The weights are fetched once (~142 MB for nano) and then live
+   in the browser's cache, which is why the second visit starts instantly.
+
+   The page is served cross-origin-isolated so SharedArrayBuffer is available and llama.cpp gets
+   more than one thread; measured in Chrome, 3 threads at ~16 tokens/s, which is a couple of
+   seconds for a tool call.
+
+   If WebAssembly threads or the download are unavailable, it falls back to asking the server,
+   and the header says so rather than claiming something that is not true. */
+const WLLAMA_VER = "3.6.1";
+// Runtime and weights both come from Cloudflare rather than from the app server or a public CDN.
+// Measured from Lagos: Modal 110 KB/s, jsDelivr ~100-300 KB/s, this 3.2 MB/s. The nano file is
+// 142 MB, so that is the difference between a 22 minute wait and a 45 second one.
+const EDGE = "https://morena-edge.ishe.workers.dev";
+const WASM_URL = EDGE + "/wllama-" + WLLAMA_VER + ".wasm";
+const ESM_URL  = EDGE + "/wllama-" + WLLAMA_VER + ".js";
+let wllama = null;       // the loaded on-device model, or null
+let onDevice = false;    // whether the last answer came from this tab
+
+function lede(where){
+  const n = PARAMS[modelKey] || "small";
+  $("#lede").innerHTML = "A <b>" + n + " parameter</b> model, running " + where +
+    ", turning Pidgin, Yoruba, Igbo and Hausa into real API calls.";
+}
+let modelKey = "";
+
 async function health(){
-  const el = $("#modelName");
-  try{
-    const p = await (await fetch("/props")).json();
+  // The on-device load starts immediately and does not wait for the server. Asking the server
+  // first meant the page sat on a cold start before it could begin fetching the weights it was
+  // going to run itself, which is the wrong way round.
+  const named = fetch("/props").then(r => r.json()).then(p => {
     const n = (p.model_path || "model").split(/[\\/]/).pop().replace(/\.gguf$/,"");
-    el.textContent = n; el.className = "status live";
-    const key = Object.keys(PARAMS).find(k => n.indexOf(k) === 0);
-    if(key) $("#lede").innerHTML = "A <b>" + PARAMS[key] + " parameter</b> model, running on this " +
-      "laptop CPU, turning Pidgin, Yoruba, Igbo and Hausa into real API calls. " +
-      "No cloud, no GPU, no network.";
+    modelKey = Object.keys(PARAMS).find(k => n.indexOf(k) === 0) || "";
+    return {n, url: p.gguf_url || "/model.gguf"};
+  }).catch(() => ({n:"", url:"/model.gguf"}));
+
+  await loadOnDevice(EDGE + "/" + (await named).n + ".gguf", named);
+}
+
+async function loadOnDevice(url, named){
+  const el = $("#modelName");
+  const setp = t => { el.textContent = t; el.className = "status load"; };
+  let note = null;
+  try{
+    setp("loading model");
+    // A 142 MB download deserves more than a word in a pill, and it deserves to say that it is
+    // a one-off, because otherwise the first visit looks like the demo is broken.
+    const MB = b => (b / 1048576).toFixed(0) + " MB";
+    note = bubble("bot", "Getting the model so it can run on your device. This happens once, "
+                             + "then it stays in your browser.<br><b id=\"dlpc\">starting</b>");
+    const bar = () => document.getElementById("dlpc");
+    const { Wllama } = await import(ESM_URL);
+    const w = new Wllama({ default: WASM_URL });
+    await w.loadModelFromUrl(url, {
+      n_ctx: 4096,
+      progressCallback: ({loaded, total}) => {
+        const pc = total ? Math.round(loaded / total * 100) + "%" : MB(loaded);
+        setp(total ? "downloading " + pc : "downloading");
+        const b = bar();
+        if(b) b.textContent = total ? pc + " of " + MB(total) : MB(loaded) + " so far";
+      },
+    });
+    note.remove();
+    wllama = w;
+    onDevice = true;
+    // The parameter count has to match the model that actually ran, so it is read from the file
+    // the browser loaded rather than assumed.
+    try{ await named; }catch(_){}
+    el.textContent = "on this device";
+    el.className = "status live";
+    lede("on this device, in this browser tab" + (w.useMultiThread ? " on " + w.nbThreads + " threads" : ""));
+    bubble("bot", "Model don load for your device. Everything wey you type from now no dey leave this tab.");
   }catch(e){
-    el.textContent = "model offline"; el.className = "status down";
+    if(note) note.remove();
+    console.error("[morena] on-device load failed, falling back to the server:", e);
+    let n = "";
+    try{ n = (await named).n; }catch(_){}
+    el.textContent = n || "server"; el.className = "status live";
+    lede("on a server, because this browser could not run it here");
   }
 }
 
 async function complete(prompt, n){
+  // No repeat_penalty. It was added to stop a degenerate "txn_txn_txn" reference and it did,
+  // but a penalty on repeated tokens is a penalty on braces and quotes, which is what JSON is
+  // mostly made of. It pushed the model into an invalid byte immediately after emitting a
+  // perfectly correct patch, and llama-server then rejected the whole response with a 500.
+  // The truncation it was meant to fix is handled by the larger n_predict instead.
+  const body = {prompt, n_predict:n||260, temperature:0, top_p:1,
+                stop:[U, R, "<|tool_result|>", "<|user|>"]};
+  if(wllama){
+    try{
+      const out = await wllama.createCompletion(body);
+      return ((out && out.choices && out.choices[0] && out.choices[0].text) || "").trim();
+    }catch(e){
+      // One bad generation should not permanently drop the page back to the server, but it
+      // should not silently swallow the reason either.
+      console.error("[morena] on-device completion failed, using the server for this one:", e);
+    }
+  }
   const r = await fetch("/completion",{method:"POST",headers:{"content-type":"application/json"},
-    // No repeat_penalty. It was added to stop a degenerate "txn_txn_txn" reference and it did,
-    // but a penalty on repeated tokens is a penalty on braces and quotes, which is what JSON is
-    // mostly made of. It pushed the model into an invalid byte immediately after emitting a
-    // perfectly correct patch, and llama-server then rejected the whole response with a 500.
-    // The truncation it was meant to fix is handled by the larger n_predict instead.
-    body:JSON.stringify({prompt, n_predict:n||260, temperature:0, top_p:1, cache_prompt:true,
-      stop:[U, R, "<|tool_result|>", "<|user|>"]})});
+    body:JSON.stringify(Object.assign({cache_prompt:true}, body))});
   if(!r.ok) throw new Error("model returned " + r.status);
   return ((await r.json()).content || "").trim();
 }
@@ -855,6 +940,16 @@ async function applyCall(raw, q, retried){
   if(!known){ bubble("bot","I no fit do that one with the tools wey I get."); return; }
 
   pending = {name: call.name, arguments: Object.assign({}, call.arguments)};
+  const renamed = repairNames(pending.arguments, q);
+  if(renamed.length){
+    const [, was, now] = renamed[0];
+    verdict([["bad", "Misspelled the name: wrote \u201c" + was + "\u201d for \u201c" + now + "\u201d."],
+             ["good", "The app put your spelling back before showing you the confirmation."]]);
+    plain([["", "It got the name wrong, and the app fixed it",
+            "It wrote \u201c" + was + "\u201d where you said \u201c" + now + "\u201d. A model this "
+            + "small spells from a small vocabulary and will mangle a name it has never seen. The "
+            + "name was in your sentence, so the app used the spelling you typed instead."]]);
+  }
   const act = ACTIONS[call.name];
   if(act && act.instant){ act.run(call.arguments); pending = null; return; }
   bubble("bot", (act ? act.say : "Here is what I will do.") + " Check am before I send.");
@@ -937,7 +1032,15 @@ function renderSheet(changed, removed){
   for(const k of removed)
     h += '<div class="frow removed"><span class="k">'+(LABEL[k]||k)+'</span>'+
          '<span class="v">removed<span class="pill removed">removed</span></span></div>';
+  // Say it before the tap, not after. Confirm still goes through and still gets declined, so the
+  // guard is visible, but nobody should have to press a button to find out it will not work.
+  const short = pending.name === "transfer_initiate" && !isNaN(a.amount) && Number(a.amount) > balance;
+  if(short)
+    h += '<div class="frow short"><span class="k">Short by</span><span class="v">'+
+         NGN(Number(a.amount) - balance)+'</span></div>';
   $("#fields").innerHTML = h;
+  $("#confirm").textContent = short ? "Confirm anyway" : "Confirm";
+  $("#confirm").classList.toggle("warn", short);
 }
 function openSheet(changed, removed){
   // Drop focus before the sheet animates in. On a phone the ask bar still holds focus from the
@@ -956,6 +1059,63 @@ function setPendBar(){
     const a = ACTIONS[pending.name] || {};
     $("#pendtext").textContent = (a.title || "Action") + " waiting";
   }
+}
+
+/* ---------------- putting names back ----------------
+
+   A 209M model spells from a small vocabulary, and on a name it has never seen it will produce
+   something that sounds right and reads wrong: "ishe" came back as "Sheih". The name is not
+   something the model should be inventing at all, though, because it is sitting right there in
+   the sentence the person typed. So: if the name the model produced is not in what they said,
+   look for the word they actually used and put that back.
+
+   Two tests, both deliberately tight. Edit distance catches a dropped or swapped letter.
+   Distance on the sorted letters catches a scramble, which is the failure this model actually
+   has. Anything looser starts rewriting names that were right. */
+const NOT_A_NAME = new Set(("send sends sent give giving transfer money naira cash abeg please pls "
+  + "make the a an to for from my his her their account bank number amount and then but now "
+  + "sharp sharply kobo thanks thank you i me we am is are it that this refund pay paid "
+  + "balance airtime data buy check verify see wetin how much go dey fit na of on at with").split(" "));
+
+function lev(a, b){
+  const m = a.length, n = b.length;
+  let prev = Array.from({length:n+1}, (_, j) => j), cur = new Array(n+1);
+  for(let i=1;i<=m;i++){
+    cur[0] = i;
+    for(let j=1;j<=n;j++)
+      cur[j] = Math.min(prev[j]+1, cur[j-1]+1, prev[j-1] + (a[i-1]===b[j-1] ? 0 : 1));
+    [prev, cur] = [cur, prev];
+  }
+  return prev[n];
+}
+const sortLetters = w => w.split("").sort().join("");
+
+function repairNames(args, said){
+  if(!args || !said) return [];
+  const low = said.toLowerCase();
+  const words = (said.match(/[A-Za-z][A-Za-z'\u2019-]{1,}/g) || [])
+    .filter(w => !NOT_A_NAME.has(w.toLowerCase()));
+  const fixed = [];
+  for(const key of ["recipient", "name", "account_name"]){
+    const v = args[key];
+    if(typeof v !== "string" || v.trim().length < 2) continue;
+    const vl = v.toLowerCase();
+    if(low.includes(vl)) continue;                       // it used their spelling, nothing to do
+    let best = null;
+    for(const w of words){
+      const wl = w.toLowerCase();
+      // Three ways this model gets a name wrong, in the order it gets them wrong.
+      // It pads: "ishe" comes back as "ishe_name", the schema leaking into the value.
+      if(wl.length >= 3 && vl.includes(wl)){ best = {w, d:0}; break; }
+      // It scrambles: "ishe" comes back as "Sheih". Same letters, wrong order.
+      // It slips: one letter dropped or swapped.
+      if(Math.abs(wl.length - vl.length) > 2) continue;
+      const d = Math.min(lev(wl, vl), lev(sortLetters(wl), sortLetters(vl)) + 1);
+      if(d <= 2 && (best === null || d < best.d)) best = {w, d};
+    }
+    if(best){ args[key] = best.w; fixed.push([key, v, best.w]); }
+  }
+  return fixed;
 }
 
 /* ---------------- what each tool does to the app ---------------- */
@@ -985,7 +1145,17 @@ function doConfirm(){
   const name = pending ? pending.name : "";
   const act = ACTIONS[name] || {};
   closeSheet();
-  if(a && name === "transfer_initiate" && !isNaN(a.amount)){
+  if(a && name === "transfer_initiate" && !isNaN(a.amount) && Number(a.amount) > balance){
+    // A bank declines this; it does not quietly go negative. The model is not wrong here, it was
+    // asked to move an amount and it did the paperwork. Whether the money is there is the
+    // account's business, and the account says no.
+    bubble("bot", "I no fit send " + NGN(a.amount) + ". Wetin dey your account na " +
+                  NGN(balance) + ", so e short by <b>" + NGN(Number(a.amount) - balance) + "</b>.");
+    plain([["bad", "Declined: not enough money",
+            "The transfer was for " + NGN(a.amount) + " and the balance is " + NGN(balance) + ". "
+            + "Deciding that is the account's job, not the model's, so the app turned it down "
+            + "and left the balance alone."]]);
+  } else if(a && name === "transfer_initiate" && !isNaN(a.amount)){
     balance -= Number(a.amount);
     $("#bal").textContent = NGN(balance);
     addTx(a.recipient || "Recipient", Number(a.amount), a.reason || "Transfer");
