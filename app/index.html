@@ -33,24 +33,15 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
    height:auto, which let the phone grow past the screen and took the ask bar and the confirm
    sheet with it, which is why nothing worked on mobile. 100dvh, not 100vh, because the browser
    chrome on iOS makes vh taller than the visible area. */
-.tabs{display:flex;max-width:390px;width:100%;margin:0 auto 12px;background:var(--panel);
-  border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-.tabs button{flex:1;position:relative;border:0;background:none;cursor:pointer;
-  padding:9px 6px 8px;font:600 11px var(--sans);color:var(--mute);
-  display:flex;flex-direction:column;align-items:center;gap:4px}
-.tabs button svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;
-  stroke-linecap:round;stroke-linejoin:round}
-.tabs button:after{content:"";position:absolute;left:22%;right:22%;bottom:0;height:2px;
-  border-radius:2px 2px 0 0;background:transparent}
-.tabs button.on{color:var(--brand)}
-.tabs button.on:after{background:var(--brand)}
-.badge{width:6px;height:6px;border-radius:50%;background:var(--accent);
-  position:absolute;top:6px;right:calc(50% - 20px);opacity:0;transition:opacity .2s}
-.badge.on{opacity:1}
+/* No tab bar on a wide screen. The tabs only exist to page between the app, the explanation
+   and the examples one at a time, and on desktop all three are already side by side, so the
+   bar was a row of buttons that switched to what you were already looking at. */
+.tabs{display:none}
 @media(max-width:940px){
   /* Nav at the top: this is the first thing on screen, so it says what the app is and what else
      is in it before anything has to be scrolled to. Icon over label, active tab underlined. */
   .tabs{display:flex;position:sticky;top:0;z-index:30;background:var(--panel);
+        width:100%;max-width:none;margin:0;border:0;border-radius:0;
         border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top)}
   .tabs button{flex:1;position:relative;border:0;background:none;cursor:pointer;
         padding:10px 6px 9px;font:600 11px var(--sans);color:var(--mute);
@@ -61,9 +52,9 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
         border-radius:2px 2px 0 0;background:transparent}
   .tabs button.on{color:var(--brand)}
   .tabs button.on:after{background:var(--brand)}
-  .badge{width:6px;height:6px;border-radius:50%;background:var(--accent);
+  .tabdot{width:6px;height:6px;border-radius:50%;background:var(--accent);
          position:absolute;top:7px;right:calc(50% - 20px);opacity:0;transition:opacity .2s}
-  .badge.on{opacity:1}
+  .tabdot.on{opacity:1}
   /* One pane at a time. The phone loses the tab bar's height so nothing hides behind it. */
   body[data-tab="app"] .side{display:none}
   body[data-tab="explain"] .phone,body[data-tab="learn"] .phone{display:none}
@@ -398,7 +389,7 @@ pre{font:11.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line
       <span>Pay</span></button>
     <button data-tab="explain">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
-      <span>What happened</span><i class="badge" id="tabdot"></i></button>
+      <span>What happened</span><i class="tabdot" id="tabdot"></i></button>
     <button data-tab="learn">
       <svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
       <span>Examples</span></button>
