@@ -73,8 +73,14 @@ class Pay:
         # Cross-origin isolation, so the browser will hand out SharedArrayBuffer and wllama can
         # run llama.cpp on more than one thread. "credentialless" rather than "require-corp"
         # because the wasm binary comes from a CDN that does not send CORP headers.
+        # no-store on the page itself. Without a Cache-Control header a browser falls back to
+        # heuristic caching, 10% of the document's age, and FileResponse sends
+        # last-modified: Thu, 01 Jan 1970, which makes that age half a century. The page was
+        # being cached for years: deploys went out and nobody saw them. The weights keep their
+        # immutable year, because those really never change under a given name.
         ISOLATE = {"Cross-Origin-Opener-Policy": "same-origin",
-                   "Cross-Origin-Embedder-Policy": "credentialless"}
+                   "Cross-Origin-Embedder-Policy": "credentialless",
+                   "Cache-Control": "no-store, must-revalidate"}
 
         @api.get("/")
         def index():
